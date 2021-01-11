@@ -1,0 +1,189 @@
+apiVersion: kafka.strimzi.io/v1alpha1
+kind: KafkaUser
+metadata:
+  name: my-connect
+  labels:
+    strimzi.io/cluster: my-cluster
+spec:
+  authentication:
+    type: tls
+
+---
+apiVersion: kafka.strimzi.io/v1alpha1
+kind: KafkaConnect
+metadata:
+  name: my-connect
+  labels:
+    app: my-connect
+  annotations:
+    strimzi.io/use-connector-resources: "true"
+spec:
+  replicas: 1
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+  bootstrapServers: my-cluster-kafka-bootstrap:9092
+  config:
+    key.converter: org.apache.kafka.connect.storage.StringConverter
+    value.converter: org.apache.kafka.connect.storage.StringConverter
+    key.converter.schemas.enable: false
+    value.converter.schemas.enable: false
+    config.providers: file
+    config.providers.file.class: org.apache.kafka.common.config.provider.FileConfigProvider
+  rack:
+    topologyKey: kubernetes.io/hostname
+  # tls:
+  #   trustedCertificates:
+  #     - secretName: my-cluster-cluster-ca-cert
+  #       certificate: ca.crt
+  # authentication:
+  #   type: tls
+  #   certificateAndKey:
+  #     secretName: my-connect
+  #     certificate: user.crt
+  #     key: user.key
+  metrics:
+    # Inspired by kafka-connect rules
+    # https://github.com/prometheus/jmx_exporter/blob/master/example_configs/kafka-connect.yml
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    rules:
+      #kafka.connect:type=app-info,client-id="{clientid}"
+      #kafka.consumer:type=app-info,client-id="{clientid}"
+      #kafka.producer:type=app-info,client-id="{clientid}"
+      - pattern: 'kafka.(.+)<type=app-info, client-id=(.+)><>start-time-ms'
+        name: kafka_$1_start_time_seconds
+        labels:
+          clientId: "$2"
+        help: "Kafka $1 JMX metric start time seconds"
+        type: GAUGE
+        valueFactor: 0.001
+      - pattern: 'kafka.(.+)<type=app-info, client-id=(.+)><>(commit-id|version): (.+)'
+        name: kafka_$1_$3_info
+        value: 1
+        labels:
+          clientId: "$2"
+          $3: "$4"
+        help: "Kafka $1 JMX metric info version and commit-id"
+        type: GAUGE
+
+      #kafka.producer:type=producer-topic-metrics,client-id="{clientid}",topic="{topic}"", partition="{partition}"
+      #kafka.consumer:type=consumer-fetch-manager-metrics,client-id="{clientid}",topic="{topic}"", partition="{partition}"
+      - pattern: kafka.(.+)<type=(.+)-metrics, client-id=(.+), topic=(.+), partition=(.+)><>(.+-total|compression-rate|.+-avg|.+-replica|.+-lag|.+-lead)
+        name: kafka_$2_$6
+        labels:
+          clientId: "$3"
+          topic: "$4"
+          partition: "$5"
+        help: "Kafka $1 JMX metric type $2"
+        type: GAUGE
+
+      #kafka.producer:type=producer-topic-metrics,client-id="{clientid}",topic="{topic}"
+      #kafka.consumer:type=consumer-fetch-manager-metrics,client-id="{clientid}",topic="{topic}"", partition="{partition}"
+      - pattern: kafka.(.+)<type=(.+)-metrics, client-id=(.+), topic=(.+)><>(.+-total|compression-rate|.+-avg)
+        name: kafka_$2_$5
+        labels:
+          clientId: "$3"
+          topic: "$4"
+        help: "Kafka $1 JMX metric type $2"
+        type: GAUGE
+
+      #kafka.connect:type=connect-node-metrics,client-id="{clientid}",node-id="{nodeid}"
+      #kafka.consumer:type=consumer-node-metrics,client-id=consumer-1,node-id="{nodeid}"
+      - pattern: kafka.(.+)<type=(.+)-metrics, client-id=(.+), node-id=(.+)><>(.+-total|.+-avg)
+        name: kafka_$2_$5
+        labels:
+          clientId: "$3"
+          nodeId: "$4"
+        help: "Kafka $1 JMX metric type $2"
+        type: UNTYPED
+
+      #kafka.connect:type=kafka-metrics-count,client-id="{clientid}"
+      #kafka.consumer:type=consumer-fetch-manager-metrics,client-id="{clientid}"
+      #kafka.consumer:type=consumer-coordinator-metrics,client-id="{clientid}"
+      #kafka.consumer:type=consumer-metrics,client-id="{clientid}"
+      - pattern: kafka.(.+)<type=(.+)-metrics, client-id=(.*)><>(.+-total|.+-avg|.+-bytes|.+-count|.+-ratio|.+-age|.+-flight|.+-threads|.+-connectors|.+-tasks|.+-ago)
+        name: kafka_$2_$4
+        labels:
+          clientId: "$3"
+        help: "Kafka $1 JMX metric type $2"
+        type: GAUGE
+
+      #kafka.connect:type=connector-task-metrics,connector="{connector}",task="{task}<> status"
+      - pattern: 'kafka.connect<type=connector-task-metrics, connector=(.+), task=(.+)><>status: ([a-z-]+)'
+        name: kafka_connect_connector_status
+        value: 1
+        labels:
+          connector: "$1"
+          task: "$2"
+          status: "$3"
+        help: "Kafka Connect JMX Connector status"
+        type: GAUGE
+
+      #kafka.connect:type=task-error-metrics,connector="{connector}",task="{task}"
+      #kafka.connect:type=source-task-metrics,connector="{connector}",task="{task}"
+      #kafka.connect:type=sink-task-metrics,connector="{connector}",task="{task}"
+      #kafka.connect:type=connector-task-metrics,connector="{connector}",task="{task}"
+      - pattern: kafka.connect<type=(.+)-metrics, connector=(.+), task=(.+)><>(.+-total|.+-count|.+-ms|.+-ratio|.+-avg|.+-failures|.+-requests|.+-timestamp|.+-logged|.+-errors|.+-retries|.+-skipped)
+        name: kafka_connect_$1_$4
+        labels:
+          connector: "$2"
+          task: "$3"
+        help: "Kafka Connect JMX metric type $1"
+        type: GAUGE
+
+      #kafka.connect:type=connector-metrics,connector="{connector}"
+      #kafka.connect:type=connect-worker-metrics,connector="{connector}"
+      - pattern: kafka.connect<type=connect-worker-metrics, connector=(.+)><>([a-z-]+)
+        name: kafka_connect_worker_$2
+        labels:
+          connector: "$1"
+        help: "Kafka Connect JMX metric $1"
+        type: GAUGE
+
+      #kafka.connect:type=connect-worker-metrics
+      - pattern: kafka.connect<type=connect-worker-metrics><>([a-z-]+)
+        name: kafka_connect_worker_$1
+        help: "Kafka Connect JMX metric worker"
+        type: GAUGE
+
+      #kafka.connect:type=connect-worker-rebalance-metrics
+      - pattern: kafka.connect<type=connect-worker-rebalance-metrics><>([a-z-]+)
+        name: kafka_connect_worker_rebalance_$1
+        help: "Kafka Connect JMX metric rebalance information"
+        type: GAUGE
+  build:
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 500m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+    output:
+      type: docker
+      image: quay.io/scholzj/kafka-connect-build:latest
+      pushSecret: kafkaconnectbuild-pull-secret
+    plugins:
+      - name: camel-elasticsearch
+        artifacts:
+          - type: tgz
+            url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-elasticsearch-rest-kafka-connector/0.7.0/camel-elasticsearch-rest-kafka-connector-0.7.0-package.tar.gz
+            sha512sum: 9f735a13efaf055fc484cddf2962ac494547f5ff8c273b833fceaf69d39b4b8133b7112f15a2d14544e32f698eb7c378486ad3a70f37282f78c2260b9e699c9e
+          - type: jar
+            url: https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.13.3/log4j-api-2.13.3.jar
+            sha512sum: 468ad08aa891b5c92156849945eee3ab074ae8f4c760b9de9a4c15a70857ae0b98bafb425e6d673e9bd43efef009a8e0b3bee767feaa4fc2fa7564f30b0a8441
+      - name: camel-telegram
+        artifacts:
+          - type: tgz
+            url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-telegram-kafka-connector/0.7.0/camel-telegram-kafka-connector-0.7.0-package.tar.gz
+            sha512sum: a9b1ac63e3284bea7836d7d24d84208c49cdf5600070e6bd1535de654f6920b74ad950d51733e8020bf4187870699819f54ef5859c7846ee4081507f48873479
+      - name: camel-aws2-s3
+        artifacts:
+            - type: tgz
+              url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-aws2-s3-kafka-connector/0.7.0/camel-aws2-s3-kafka-connector-0.7.0-package.tar.gz
+              sha512sum: a612431f8a584de1d959c591b536ce3e60d575273d68f5f8dfa0effd278b627c469182df66dd4ac275af0832f4941d03c98987a6573c4d23e57231464ddb5ef8
