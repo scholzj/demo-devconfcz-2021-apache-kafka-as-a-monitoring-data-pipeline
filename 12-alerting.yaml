@@ -17,11 +17,11 @@ spec:
     acls:
       - resource:
           type: topic
-          name: telegram-inbox
+          name: fluent-bit-logs
         operation: Read
       - resource:
           type: topic
-          name: telegram-inbox
+          name: fluent-bit-logs
         operation: Describe
       - resource:
           type: group
@@ -30,19 +30,11 @@ spec:
         operation: Read
       - resource:
           type: topic
-          name: sentiment-analysis
+          name: logging-alerts
         operation: Write
       - resource:
           type: topic
-          name: sentiment-analysis
-        operation: Describe
-      - resource:
-          type: topic
-          name: object-detection
-        operation: Write
-      - resource:
-          type: topic
-          name: object-detection
+          name: logging-alerts
         operation: Describe
 ---
 

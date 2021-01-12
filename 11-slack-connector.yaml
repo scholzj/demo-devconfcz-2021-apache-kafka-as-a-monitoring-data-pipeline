@@ -8,7 +8,6 @@ metadata:
 spec:
   class: org.apache.camel.kafkaconnector.slack.CamelSlackSinkConnector
   tasksMax: 1
-  pause: true
   config:
     key.converter: org.apache.kafka.connect.storage.StringConverter
     value.converter: org.apache.kafka.connect.storage.StringConverter
