@@ -157,7 +157,7 @@ First show the empty bucket.
 Then deploy the S3 connector from [`09-s3-connector.yaml`](./09-s3-connector.yaml):
 
 ```
-kubectl apply -f 07-elasticsearch-connector.yaml
+kubectl apply -f 09-s3-connector.yaml
 ```
 
 And go back to Amazon AWS S3 to check the data in the S3 bucket.
