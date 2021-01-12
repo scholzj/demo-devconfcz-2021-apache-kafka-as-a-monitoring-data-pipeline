@@ -26,12 +26,16 @@ spec:
         port: 9093
         tls: true
         type: internal
+        authentication:
+          type: tls
       - name: lb
         port: 9094
-        tls: false
+        tls: true
         type: loadbalancer
-    # authorization:
-    #   type: simple
+        authentication:
+          type: tls
+    authorization:
+      type: simple
     #   superUsers:
     #     - CN=my-connect
     #     - my-connect

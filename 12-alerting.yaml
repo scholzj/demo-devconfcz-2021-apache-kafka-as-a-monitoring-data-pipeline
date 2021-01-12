@@ -1,0 +1,94 @@
+###########
+# Kafka Streams API -> Alerting
+###########
+
+# User
+apiVersion: kafka.strimzi.io/v1beta1
+kind: KafkaUser
+metadata:
+  name: alerting
+  labels:
+    strimzi.io/cluster: my-cluster
+spec:
+  authentication:
+    type: tls
+  authorization:
+    type: simple
+    acls:
+      - resource:
+          type: topic
+          name: telegram-inbox
+        operation: Read
+      - resource:
+          type: topic
+          name: telegram-inbox
+        operation: Describe
+      - resource:
+          type: group
+          name: alerting
+          patternType: prefix
+        operation: Read
+      - resource:
+          type: topic
+          name: sentiment-analysis
+        operation: Write
+      - resource:
+          type: topic
+          name: sentiment-analysis
+        operation: Describe
+      - resource:
+          type: topic
+          name: object-detection
+        operation: Write
+      - resource:
+          type: topic
+          name: object-detection
+        operation: Describe
+---
+
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: alerting
+  name: alerting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alerting
+  template:
+    metadata:
+      labels:
+        app: alerting
+    spec:
+      containers:
+        - name: alerting
+          image: quay.io/scholzj/kafka-streams-alerting:latest
+          env:
+            - name: CA_CRT
+              valueFrom:
+                secretKeyRef:
+                  name: my-cluster-cluster-ca-cert
+                  key: ca.crt
+            - name: USER_CRT
+              valueFrom:
+                secretKeyRef:
+                  name: alerting
+                  key: user.crt
+            - name: USER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: alerting
+                  key: user.key
+            - name: BOOTSTRAP_SERVERS
+              value: my-cluster-kafka-bootstrap:9093
+            - name: APPLICATION_ID
+              value: alerting
+            - name: SOURCE_TOPIC
+              value: fluent-bit-logs
+            - name: TARGET_TOPIC
+              value: logging-alerts
+            - name: LOG_LEVEL
+              value: "INFO"

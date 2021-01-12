@@ -1,2 +1,8 @@
 00-credentials/
 unused/
+**/target
+*.iml
+**/.idea
+ca.crt
+user.crt
+user.key

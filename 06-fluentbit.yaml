@@ -34,6 +34,28 @@ subjects:
   namespace: myproject
 ---
 
+apiVersion: kafka.strimzi.io/v1alpha1
+kind: KafkaUser
+metadata:
+  name: fluent-bit
+  labels:
+    strimzi.io/cluster: my-cluster
+spec:
+  authentication:
+    type: tls
+  authorization:
+    type: simple
+    acls:
+      - resource:
+          type: topic
+          name: fluent-bit-logs
+        operation: Describe
+      - resource:
+          type: topic
+          name: fluent-bit-logs
+        operation: Write
+---
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -89,7 +111,7 @@ data:
     [OUTPUT]
         Name           kafka
         Match          *
-        Brokers        my-cluster-kafka-bootstrap:9092
+        Brokers        my-cluster-kafka-bootstrap:9093
         Topics         fluent-bit-logs
         Timestamp_Key  @timestamp
         Timestamp_Format iso8601
@@ -100,6 +122,11 @@ data:
         rdkafka.queue.buffering.max.kbytes 10240
         # for logs you'll probably want this ot be 0 or 1, not more
         rdkafka.request.required.acks 1
+        # TLS configuration
+        rdkafka.security.protocol ssl 
+        rdkafka.ssl.ca.location /fluent-bit/tls/kafka-cluster-certs/ca.crt
+        rdkafka.ssl.certificate.location /fluent-bit/tls/kafka-user-certs/user.crt
+        rdkafka.ssl.key.location /fluent-bit/tls/kafka-user-certs/user.key
 
   parsers.conf: |
     [PARSER]
@@ -180,51 +207,63 @@ spec:
         prometheus.io/path: /api/v1/metrics/prometheus
     spec:
       containers:
-      - name: fluent-bit
-        image: fluent/fluent-bit:1.6
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 2020
-        readinessProbe:
-          httpGet:
-            path: /api/v1/metrics/prometheus
-            port: 2020
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 2020
-        resources:
-          requests:
-            cpu: 5m
-            memory: 10Mi
-          limits:
-            cpu: 50m
-            memory: 60Mi
-        volumeMounts:
-        - name: varlog
-          mountPath: /var/log
-        - name: varlibdockercontainers
-          mountPath: /var/lib/docker/containers
-          readOnly: true
-        - name: fluent-bit-config
-          mountPath: /fluent-bit/etc/
+        - name: fluent-bit
+          image: fluent/fluent-bit:1.6
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 2020
+          readinessProbe:
+            httpGet:
+              path: /api/v1/metrics/prometheus
+              port: 2020
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 2020
+          resources:
+            requests:
+              cpu: 5m
+              memory: 10Mi
+            limits:
+              cpu: 50m
+              memory: 60Mi
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc/
+            - name: kafka-user-certs
+              mountPath: /fluent-bit/tls/kafka-user-certs
+              readOnly: true
+            - name: kafka-cluster-certs
+              mountPath: /fluent-bit/tls/kafka-cluster-certs
+              readOnly: true
       terminationGracePeriodSeconds: 10
       volumes:
-      - name: varlog
-        hostPath:
-          path: /var/log
-      - name: varlibdockercontainers
-        hostPath:
-          path: /var/lib/docker/containers
-      - name: fluent-bit-config
-        configMap:
-          name: fluent-bit-config
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
+        - name: kafka-user-certs
+          secret:
+            secretName: fluent-bit
+        - name: kafka-cluster-certs
+          secret:
+            secretName: my-cluster-cluster-ca-cert
       serviceAccountName: fluent-bit
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: Exists
-        effect: NoSchedule
-      - operator: "Exists"
-        effect: "NoExecute"
-      - operator: "Exists"
-        effect: "NoSchedule"
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - operator: "Exists"
+          effect: "NoExecute"
+        - operator: "Exists"
+          effect: "NoSchedule"

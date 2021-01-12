@@ -7,8 +7,115 @@ metadata:
 spec:
   authentication:
     type: tls
-
+  authorization:
+    type: simple
+    acls:
+      # Kafka Connects internal topics
+      - resource:
+          type: group
+          name: connect-cluster
+        operation: Read
+      - resource:
+          type: topic
+          name: connect-cluster-configs
+        operation: Read
+      - resource:
+          type: topic
+          name: connect-cluster-configs
+        operation: Describe
+      - resource:
+          type: topic
+          name: connect-cluster-configs
+        operation: Write
+      - resource:
+          type: topic
+          name: connect-cluster-configs
+        operation: Describe
+      - resource:
+          type: topic
+          name: connect-cluster-configs
+        operation: Create
+      - resource:
+          type: topic
+          name: connect-cluster-status
+        operation: Read
+      - resource:
+          type: topic
+          name: connect-cluster-status
+        operation: Describe
+      - resource:
+          type: topic
+          name: connect-cluster-status
+        operation: Write
+      - resource:
+          type: topic
+          name: connect-cluster-status
+        operation: Describe
+      - resource:
+          type: topic
+          name: connect-cluster-status
+        operation: Create
+      - resource:
+          type: topic
+          name: connect-cluster-offsets
+        operation: Read
+      - resource:
+          type: topic
+          name: connect-cluster-offsets
+        operation: Describe
+      - resource:
+          type: topic
+          name: connect-cluster-offsets
+        operation: Write
+      - resource:
+          type: topic
+          name: connect-cluster-offsets
+        operation: Describe
+      - resource:
+          type: topic
+          name: connect-cluster-offsets
+        operation: Create
+      # Connector topics: ElasticSearch Sink
+      - resource:
+          type: topic
+          name: fluent-bit-logs
+        operation: Describe
+      - resource:
+          type: topic
+          name: fluent-bit-logs
+        operation: Read
+      - resource:
+          type: group
+          name: connect-elasticsearch-connector
+        operation: Read
+      # Connector topics: S3 Sink
+      - resource:
+          type: topic
+          name: fluent-bit-logs
+        operation: Describe
+      - resource:
+          type: topic
+          name: fluent-bit-logs
+        operation: Read
+      - resource:
+          type: group
+          name: connect-s3-connector
+        operation: Read
+      # Connector topics: slack sink
+      - resource:
+          type: topic
+          name: logging-alerts
+        operation: Read
+      - resource:
+          type: topic
+          name: logging-alerts
+        operation: Describe
+      - resource:
+          type: group
+          name: connect-slack-connector
+        operation: Read
 ---
+
 apiVersion: kafka.strimzi.io/v1alpha1
 kind: KafkaConnect
 metadata:
@@ -26,7 +133,7 @@ spec:
     limits:
       memory: 2Gi
       cpu: 1000m
-  bootstrapServers: my-cluster-kafka-bootstrap:9092
+  bootstrapServers: my-cluster-kafka-bootstrap:9093
   config:
     key.converter: org.apache.kafka.connect.storage.StringConverter
     value.converter: org.apache.kafka.connect.storage.StringConverter
@@ -34,18 +141,57 @@ spec:
     value.converter.schemas.enable: false
     config.providers: file
     config.providers.file.class: org.apache.kafka.common.config.provider.FileConfigProvider
-  rack:
-    topologyKey: kubernetes.io/hostname
-  # tls:
-  #   trustedCertificates:
-  #     - secretName: my-cluster-cluster-ca-cert
-  #       certificate: ca.crt
-  # authentication:
-  #   type: tls
-  #   certificateAndKey:
-  #     secretName: my-connect
-  #     certificate: user.crt
-  #     key: user.key
+  externalConfiguration:
+    volumes:
+      - name: aws-credentials
+        secret:
+          secretName: aws-credentials
+      - name: slack-credentials
+        secret:
+          secretName: slack-credentials
+  # rack:
+  #   topologyKey: kubernetes.io/hostname
+  tls:
+    trustedCertificates:
+      - secretName: my-cluster-cluster-ca-cert
+        certificate: ca.crt
+  authentication:
+    type: tls
+    certificateAndKey:
+      secretName: my-connect
+      certificate: user.crt
+      key: user.key
+  build:
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 500m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+    output:
+      type: docker
+      image: quay.io/scholzj/kafka-connect-build:latest
+      pushSecret: kafkaconnectbuild-pull-secret
+    plugins:
+      - name: camel-elasticsearch
+        artifacts:
+          - type: tgz
+            url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-elasticsearch-rest-kafka-connector/0.7.0/camel-elasticsearch-rest-kafka-connector-0.7.0-package.tar.gz
+            sha512sum: 9f735a13efaf055fc484cddf2962ac494547f5ff8c273b833fceaf69d39b4b8133b7112f15a2d14544e32f698eb7c378486ad3a70f37282f78c2260b9e699c9e
+          - type: jar
+            url: https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.13.3/log4j-api-2.13.3.jar
+            sha512sum: 468ad08aa891b5c92156849945eee3ab074ae8f4c760b9de9a4c15a70857ae0b98bafb425e6d673e9bd43efef009a8e0b3bee767feaa4fc2fa7564f30b0a8441
+      - name: camel-slack
+        artifacts:
+          - type: tgz
+            url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-slack-kafka-connector/0.7.0/camel-slack-kafka-connector-0.7.0-package.tar.gz
+            sha512sum: 7141160f7c6259dd4306510efe6c0c4bc759e611c6c6a5b4391e385044ac523289846e2c28dfeca03831639b16db149d85d3804d80e11c305a187326e371e77a
+      - name: camel-aws2-s3
+        artifacts:
+            - type: tgz
+              url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-aws2-s3-kafka-connector/0.7.0/camel-aws2-s3-kafka-connector-0.7.0-package.tar.gz
+              sha512sum: a612431f8a584de1d959c591b536ce3e60d575273d68f5f8dfa0effd278b627c469182df66dd4ac275af0832f4941d03c98987a6573c4d23e57231464ddb5ef8
   metrics:
     # Inspired by kafka-connect rules
     # https://github.com/prometheus/jmx_exporter/blob/master/example_configs/kafka-connect.yml
@@ -156,34 +302,3 @@ spec:
         name: kafka_connect_worker_rebalance_$1
         help: "Kafka Connect JMX metric rebalance information"
         type: GAUGE
-  build:
-    resources:
-      requests:
-        memory: 128Mi
-        cpu: 500m
-      limits:
-        memory: 1Gi
-        cpu: 1000m
-    output:
-      type: docker
-      image: quay.io/scholzj/kafka-connect-build:latest
-      pushSecret: kafkaconnectbuild-pull-secret
-    plugins:
-      - name: camel-elasticsearch
-        artifacts:
-          - type: tgz
-            url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-elasticsearch-rest-kafka-connector/0.7.0/camel-elasticsearch-rest-kafka-connector-0.7.0-package.tar.gz
-            sha512sum: 9f735a13efaf055fc484cddf2962ac494547f5ff8c273b833fceaf69d39b4b8133b7112f15a2d14544e32f698eb7c378486ad3a70f37282f78c2260b9e699c9e
-          - type: jar
-            url: https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.13.3/log4j-api-2.13.3.jar
-            sha512sum: 468ad08aa891b5c92156849945eee3ab074ae8f4c760b9de9a4c15a70857ae0b98bafb425e6d673e9bd43efef009a8e0b3bee767feaa4fc2fa7564f30b0a8441
-      - name: camel-telegram
-        artifacts:
-          - type: tgz
-            url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-telegram-kafka-connector/0.7.0/camel-telegram-kafka-connector-0.7.0-package.tar.gz
-            sha512sum: a9b1ac63e3284bea7836d7d24d84208c49cdf5600070e6bd1535de654f6920b74ad950d51733e8020bf4187870699819f54ef5859c7846ee4081507f48873479
-      - name: camel-aws2-s3
-        artifacts:
-            - type: tgz
-              url: https://repo.maven.apache.org/maven2/org/apache/camel/kafkaconnector/camel-aws2-s3-kafka-connector/0.7.0/camel-aws2-s3-kafka-connector-0.7.0-package.tar.gz
-              sha512sum: a612431f8a584de1d959c591b536ce3e60d575273d68f5f8dfa0effd278b627c469182df66dd4ac275af0832f4941d03c98987a6573c4d23e57231464ddb5ef8

@@ -1,0 +1,19 @@
+apiVersion: kafka.strimzi.io/v1alpha1
+kind: KafkaConnector
+metadata:
+  name: slack-connector
+  namespace: myproject
+  labels:
+    strimzi.io/cluster: my-connect
+spec:
+  class: org.apache.camel.kafkaconnector.slack.CamelSlackSinkConnector
+  tasksMax: 1
+  pause: true
+  config:
+    key.converter: org.apache.kafka.connect.storage.StringConverter
+    value.converter: org.apache.kafka.connect.storage.StringConverter
+    topics: logging-alerts
+    camel.sink.path.channel: '#jakub-alerts'
+    camel.sink.endpoint.iconEmoji: ':kafka:'
+    camel.sink.endpoint.username: Log Alerts
+    camel.sink.endpoint.webhookUrl: ${file:/opt/kafka/external-configuration/slack-credentials/slack-credentials.properties:webhookUrl}
