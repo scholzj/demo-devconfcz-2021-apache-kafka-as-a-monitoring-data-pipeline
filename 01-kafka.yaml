@@ -18,10 +18,6 @@ spec:
       -Xms: 1024m
       -Xmx: 1024m
     listeners:
-      - name: plaintext
-        port: 9092
-        tls: false
-        type: internal
       - name: encrypted
         port: 9093
         tls: true
