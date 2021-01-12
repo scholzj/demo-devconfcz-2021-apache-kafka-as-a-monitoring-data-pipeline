@@ -22,7 +22,7 @@ spec:
       - resource:
           type: topic
           name: connect-cluster-configs
-        operation: Describe
+        operation: DescribeConfigs
       - resource:
           type: topic
           name: connect-cluster-configs
@@ -42,7 +42,7 @@ spec:
       - resource:
           type: topic
           name: connect-cluster-status
-        operation: Describe
+        operation: DescribeConfigs
       - resource:
           type: topic
           name: connect-cluster-status
@@ -62,7 +62,7 @@ spec:
       - resource:
           type: topic
           name: connect-cluster-offsets
-        operation: Describe
+        operation: DescribeConfigs
       - resource:
           type: topic
           name: connect-cluster-offsets
