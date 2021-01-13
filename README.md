@@ -4,9 +4,15 @@ This repository container the demo for my talk at the [DevConf.CZ](https://www.d
 
 ## Slides
 
-TODO: Add slides
+The slides can be found in [Google Docs](https://docs.google.com/presentation/d/1-U5D-7yAeQT2ndEJ5Ko_IfkgvkCcCueukmI8N9ppyP0/edit?usp=sharing).
 
-## Prerequisites
+## Video recording
+
+The talk recording can be found on [YouTube](https://youtu.be/xAqPpo1trI4).
+
+## Demo Prerequisites
+
+The prerequisites were deployed before the actual demo to save time.
 
 ### Namespace
 
