@@ -8,7 +8,7 @@ The slides can be found in [Google Docs](https://docs.google.com/presentation/d/
 
 ## Video recording
 
-The talk recording can be found on [YouTube](https://youtu.be/xAqPpo1trI4).
+The talk recording can be found on [YouTube](https://youtu.be/4VF5c2_v8QM).
 
 ## Demo Prerequisites
 
